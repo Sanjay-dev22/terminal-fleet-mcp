@@ -198,6 +198,15 @@ once, in the background, while the user keeps working on other things, safe to d
 
 If term_read's text doesn't make sense (garbled rendering, a TUI you can't parse from
 characters alone), fall back to term_screenshot for an actual image of the window.
+
+Claude Code specifics, confirmed by direct testing: UP at an empty prompt recalls the last
+sent message into the editable box (edit with BACKSPACE/text, then enter to resend as a new
+turn). ESC at an empty prompt just clears the box; it is not a rewind shortcut. /rewind opens
+a checkpoint picker (navigate with UP/DOWN, ENTER to pick a point, then ENTER again on
+"Restore conversation" to confirm) and also drops that message back into the editable box
+afterward, so rewind-then-edit-then-resend is one continuous flow. For "@" file/agent mentions,
+accept the highlighted suggestion with TAB, not ENTER -- ENTER on a bare "@" submits the
+literal "@" character as the message instead of completing it.
 `.trim();
 
 const server = new McpServer(
