@@ -168,8 +168,12 @@ a whole block in one atomic write, not typed character by character, so length a
 named keys (ENTER, ESC, TAB, UP/DOWN/LEFT/RIGHT, HOME, END, PGUP, PGDN, DELETE, BACKSPACE,
 INSERT, BREAK, F1-F12) or a single letter/digit, optionally combined with CTRL/ALT/SHIFT via
 "+", e.g. ["CTRL+C"], ["UP","UP","ENTER"], ["CTRL+SHIFT+P"], ["ALT+F4"]. This covers real
-shortcuts and an interactive CLI's own keybindings (e.g. shift+enter for a newline without
-submitting, inside tools like Claude Code's own TUI).
+shortcuts and an interactive CLI's own keybindings. For a multi-line message (e.g. Claude
+Code's own TUI, which normally takes shift+enter for a newline without submitting), do NOT
+send a SHIFT+ENTER key combo -- that is indistinguishable from plain ENTER once injected this
+way and will submit early. Instead, put a literal "\n" inside "text" itself; it's delivered as
+a real newline character without triggering submission, and the target renders it as one
+multi-line input exactly like a human pressing shift+enter would.
 
 Known limitation: CTRL+C is delivered as a real keystroke (the console visibly echoes "^C"
 when it arrives, confirming recognition), which reliably interrupts most interactive
@@ -260,16 +264,29 @@ server.registerTool(
       text: z.string().optional().describe('Literal text to send (e.g. a command or a chat message). Delivered as one atomic block, not typed character by character -- length and content (digits, symbols, multi-line) do not affect reliability.'),
       enter: z.boolean().optional().default(false).describe('Press Enter after the text/keys.'),
       keys: z.array(z.string()).optional()
-        .describe('Key combos sent in order before text, e.g. ["CTRL+C"], ["UP","UP","ENTER"], ["CTRL+SHIFT+P"], ["ALT+F4"]. Named keys: ENTER, ESC, TAB, UP, DOWN, LEFT, RIGHT, HOME, END, PGUP, PGDN, DELETE, BACKSPACE, INSERT, BREAK, F1-F12, or a single letter/digit -- optionally combined with CTRL/ALT/SHIFT via "+".')
+        .describe('Key combos sent in order BEFORE text (use "sequence" instead if you need keys and text interleaved). Named keys: ENTER, ESC, TAB, UP, DOWN, LEFT, RIGHT, HOME, END, PGUP, PGDN, DELETE, BACKSPACE, INSERT, BREAK, F1-F12, or a single letter/digit -- optionally combined with CTRL/ALT/SHIFT via "+", e.g. ["CTRL+C"], ["UP","UP","ENTER"], ["CTRL+SHIFT+P"], ["ALT+F4"]. Do NOT use ["SHIFT+ENTER"] to try to insert a newline -- it is indistinguishable from plain ENTER once injected and will submit early; put a literal "\\n" inside "text" instead.'),
+      sequence: z.array(z.object({
+        text: z.string().optional().describe('Literal text for this step.'),
+        keys: z.array(z.string()).optional().describe('Key combos for this step, same syntax as the top-level "keys".'),
+        enter: z.boolean().optional().describe('Press Enter at this step.')
+      })).optional().describe('An ordered list of steps (each with its own text/keys/enter) for when you need precise interleaving, e.g. a key combo that must land between two typed pieces of text. Within each step, keys still apply before that step\'s text. Takes priority over the top-level text/keys/enter when given. For multi-line messages specifically, prefer a literal "\\n" inside one step\'s "text" over a SHIFT+ENTER key step -- see the "keys" note.')
     }
   },
-  async ({ pid, text, enter, keys }) => {
+  async ({ pid, text, enter, keys, sequence }) => {
     const resolved = resolvePid(pid);
     const actions = [];
     try {
-      if (keys && keys.length) actions.push(...keys.map(parseKeyToken));
-      if (text) actions.push(...textToActions(text));
-      if (enter) actions.push(parseKeyToken('ENTER'));
+      if (sequence && sequence.length) {
+        for (const step of sequence) {
+          if (step.keys && step.keys.length) actions.push(...step.keys.map(parseKeyToken));
+          if (step.text) actions.push(...textToActions(step.text));
+          if (step.enter) actions.push(parseKeyToken('ENTER'));
+        }
+      } else {
+        if (keys && keys.length) actions.push(...keys.map(parseKeyToken));
+        if (text) actions.push(...textToActions(text));
+        if (enter) actions.push(parseKeyToken('ENTER'));
+      }
     } catch (e) {
       return { content: [{ type: 'text', text: e.message }], isError: true };
     }

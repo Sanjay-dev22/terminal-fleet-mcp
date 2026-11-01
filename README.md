@@ -139,6 +139,7 @@ npm run example:fleet              # the actual headline use case: two labeled w
 - **Windows only.** The console-reading/writing mechanism is Win32-specific.
 - **Reads text, not pixels (by default).** `term_read` returns the character buffer; use `term_screenshot` for a true image.
 - **Can't reach an IDE's own integrated terminal panel** (e.g. VS Code's) directly — this controls independent OS-level console windows, not IDE panels.
+- **SHIFT+ENTER doesn't insert a newline.** Once injected via `WriteConsoleInput`, it's indistinguishable from plain ENTER and submits early — confirmed empirically while testing multi-line input into Claude Code's own TUI. For a real multi-line message, put a literal `\n` inside `text` itself instead of sending a `SHIFT+ENTER` key combo; that's delivered as an actual newline character and the target renders it as one multi-line input, same as a human pressing shift+enter.
 - **CTRL+C doesn't reliably abort a program mid-blocking-call.** It's delivered as a real keystroke (the console visibly echoes `^C`, confirming it arrived), which reliably interrupts most interactive programs reading it from their input stream. It does **not** reliably raise the OS-level break *signal* a program like a bare PowerShell `Read-Host` specifically waits for — Windows has no supported way to raise that signal targeted at an unrelated, already-running process from the outside. If a worker is truly stuck there, `term_close` and respawn rather than expecting `CTRL+C` to free it.
 
 ## License
