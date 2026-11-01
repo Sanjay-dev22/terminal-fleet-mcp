@@ -433,15 +433,20 @@ server.registerTool(
 server.registerTool(
   'term_close',
   {
-    description: 'Close a terminal window (terminates the process).',
+    description: 'Close a terminal window and everything running inside it (terminates the whole process tree, not just the shell).',
     inputSchema: { pid: z.string().describe('Process id or label from term_spawn/term_list') }
   },
   async ({ pid }) => {
     const resolved = resolvePid(pid);
     try {
-      execFileSync('powershell.exe', ['-Command', `Stop-Process -Id ${Number(resolved)} -Force -ErrorAction SilentlyContinue`]);
+      // taskkill /T kills the whole process tree. Stop-Process alone only kills the
+      // shell itself -- Windows does not auto-kill children when a parent dies, so a
+      // long-lived child (e.g. a "claude" session run via term_spawn's command) would
+      // otherwise keep running invisibly after its window closes. Confirmed empirically:
+      // closing a terminal running "claude" left the claude.exe process alive as an orphan.
+      execFileSync('taskkill.exe', ['/PID', String(Number(resolved)), '/T', '/F'], { stdio: 'ignore' });
       terminals.delete(resolved);
-      return { content: [{ type: 'text', text: `Closed pid ${resolved}` }] };
+      return { content: [{ type: 'text', text: `Closed pid ${resolved} and its process tree` }] };
     } catch (e) {
       return { content: [{ type: 'text', text: `Close failed: ${e.message}` }], isError: true };
     }
