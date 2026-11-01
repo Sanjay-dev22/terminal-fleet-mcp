@@ -1,5 +1,7 @@
 param(
-    [Parameter(Mandatory=$true)][int]$ProcessId
+    [Parameter(Mandatory=$true)][int]$ProcessId,
+    [Parameter(Mandatory=$false)][switch]$WithColor,
+    [Parameter(Mandatory=$false)][int]$ExtraScrollback = 0
 )
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -54,9 +56,20 @@ public class ConsoleReader {
         IntPtr hConsoleOutput, [Out] StringBuilder lpCharacter, uint nLength,
         COORD dwReadCoord, out uint lpNumberOfCharsRead);
 
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool ReadConsoleOutputAttribute(
+        IntPtr hConsoleOutput, [Out] ushort[] lpAttribute, uint nLength,
+        COORD dwReadCoord, out uint lpNumberOfAttrsRead);
+
     public const int STD_OUTPUT_HANDLE = -11;
 }
 "@ -ErrorAction SilentlyContinue
+
+# Standard 16-color console palette, indexed by the low nibble (foreground) of wAttributes.
+$colorNames = @(
+    "BLACK","BLUE","GREEN","CYAN","RED","MAGENTA","YELLOW","GRAY",
+    "DARKGRAY","BRIGHT_BLUE","BRIGHT_GREEN","BRIGHT_CYAN","BRIGHT_RED","BRIGHT_MAGENTA","BRIGHT_YELLOW","WHITE"
+)
 
 # A process can only be attached to one console at a time, so detach from our own first.
 [ConsoleReader]::FreeConsole() | Out-Null
@@ -84,9 +97,10 @@ try {
         exit 1
     }
 
-    # Read only the visible window region (srWindow), not the entire scrollback buffer,
-    # so output matches what's actually shown on screen right now.
-    $top = $info.srWindow.Top
+    # Read the visible window region (srWindow) by default, so output matches what's
+    # actually shown on screen right now. ExtraScrollback extends upward into the
+    # buffer's history above the visible window, clamped at 0.
+    $top = [Math]::Max(0, $info.srWindow.Top - $ExtraScrollback)
     $bottom = $info.srWindow.Bottom
     $width = $info.dwSize.X
 
@@ -107,7 +121,35 @@ try {
         # the console's legacy OEM codepage handling before we even read them — a
         # pre-existing display quirk of the target console, not our reading. Strip for readability.
         $line = $line -replace [char]0x00C3, [char]0x2502
-        $lines += $line.TrimEnd()
+        $line = $line.TrimEnd()
+
+        if ($WithColor) {
+            $attrs = [uint16[]]::new($width)
+            $attrsRead = 0
+            [ConsoleReader]::ReadConsoleOutputAttribute($h, $attrs, [uint32]$width, $coord, [ref]$attrsRead) | Out-Null
+            # Collapse into runs of same foreground color and tag each run inline, e.g.
+            # [RED]error text[/RED], so color changes survive being flattened to plain text.
+            $annotated = ""
+            $runStart = 0
+            $runColor = $attrs[0] -band 0xF
+            for ($i = 1; $i -le $line.Length; $i++) {
+                $curColor = if ($i -lt $line.Length) { $attrs[$i] -band 0xF } else { -1 }
+                if ($curColor -ne $runColor) {
+                    $runText = $line.Substring($runStart, $i - $runStart)
+                    if ($runColor -eq 7 -or $runText.Trim().Length -eq 0) {
+                        $annotated += $runText
+                    } else {
+                        $name = $colorNames[$runColor]
+                        $annotated += "[$name]$runText[/$name]"
+                    }
+                    $runStart = $i
+                    $runColor = $curColor
+                }
+            }
+            $lines += $annotated
+        } else {
+            $lines += $line
+        }
     }
 
     $lines -join "`n"

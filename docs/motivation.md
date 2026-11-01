@@ -24,6 +24,6 @@ That observation is what this project is actually about. The specific data-loss 
 
 ## The result
 
-`visible-terminal-mcp` deliberately spawns a real, classic console window instead of a hidden pseudo-terminal, and reads back what's on screen through the same Windows Console API a human's own eyes are looking at — so a supervised agent action and an unsupervised one produce a terminal that looks and behaves identically to the person watching it.
+`terminal-fleet-mcp` deliberately spawns a real, classic console window instead of a hidden pseudo-terminal, and reads back what's on screen through the same Windows Console API a human's own eyes are looking at — so a supervised agent action and an unsupervised one produce a terminal that looks and behaves identically to the person watching it.
 
 The original data-loss bug itself is a separate, upstream issue in the host tool's handling of concurrent session resumption — this project doesn't fix that. What it fixes is the *inability to watch while testing for it*, which is the gap that let the original incident go unnoticed as long as it did.

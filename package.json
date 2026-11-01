@@ -1,13 +1,14 @@
 {
-  "name": "visible-terminal-mcp",
-  "version": "1.0.0",
-  "description": "MCP server that gives an AI agent control of a genuinely visible Windows terminal window — spawn it, type into it, read exactly what's on screen, close it — so a human can watch every action in real time instead of trusting a hidden process.",
+  "name": "terminal-fleet-mcp",
+  "version": "0.2.0",
+  "description": "MCP server that gives an AI agent control of a fleet of genuinely visible Windows terminal windows — spawn several, type into each, read exactly what's on screen, close them — so one controlling agent session can orchestrate many worker terminal/Claude Code sessions while a human watches every window in real time.",
   "main": "src/server.js",
   "type": "commonjs",
   "scripts": {
     "start": "node src/server.js",
     "example:basic": "node examples/basic-spawn-type-read.js",
-    "example:menu-navigation": "node examples/menu-navigation.js"
+    "example:menu-navigation": "node examples/menu-navigation.js",
+    "example:fleet": "node examples/fleet-orchestration.js"
   },
   "keywords": [
     "mcp",
@@ -16,6 +17,9 @@
     "windows",
     "console",
     "automation",
+    "orchestration",
+    "multi-session",
+    "fleet",
     "claude",
     "claude-code",
     "ai-agent"
@@ -24,7 +28,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Sanjay-dev22/visible-terminal-mcp.git"
+    "url": "git+https://github.com/Sanjay-dev22/terminal-fleet-mcp.git"
   },
   "os": [
     "win32"
